@@ -233,10 +233,9 @@ public class ProtoSignature {
           TemporaryExposureKey.newBuilder()
               .setKeyData(ByteString.copyFrom(Base64.getDecoder().decode(key.getKeyData())))
               .setRollingPeriod(key.getRollingPeriod())
-              .setRollingStartIntervalNumber(key.getRollingStartNumber());
-      if (debug) {
-        builder.setReportType(ReportType.CONFIRMED_TEST).setDaysSinceOnsetOfSymptoms(2);
-      }
+              .setRollingStartIntervalNumber(key.getRollingStartNumber())
+              .setDaysSinceOnsetOfSymptoms(key.getDaysSinceOnsetOfSymptoms())
+              .setReportType(ReportType.valueOf(key.getReportType()));
       var protoKey = builder.build();
       tekList.add(protoKey);
     }

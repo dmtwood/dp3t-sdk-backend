@@ -8,12 +8,12 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SignatureException;
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import javax.validation.Valid;
 import org.dpppt.backend.sdk.data.gaen.FakeKeyService;
-import org.dpppt.backend.sdk.model.gaen.GaenKey;
+import org.dpppt.backend.sdk.data.gaen.GAENDataService;
+import org.dpppt.backend.sdk.model.gaen.CountryShareConfiguration;
 import org.dpppt.backend.sdk.model.gaen.GaenV2UploadKeysRequest;
 import org.dpppt.backend.sdk.utils.DurationExpiredException;
 import org.dpppt.backend.sdk.utils.UTCInstant;
@@ -72,6 +72,7 @@ public class GaenV2Controller {
   private final ValidationUtils validationUtils;
   private final FakeKeyService fakeKeyService;
   private final ProtoSignature gaenSigner;
+  private final GAENDataService dataService;
   private final Duration releaseBucketDuration;
   private final Duration requestTime;
   private final Duration exposedListCacheControl;
@@ -82,6 +83,7 @@ public class GaenV2Controller {
       ValidationUtils validationUtils,
       FakeKeyService fakeKeyService,
       ProtoSignature gaenSigner,
+      GAENDataService dataService,
       Duration releaseBucketDuration,
       Duration requestTime,
       Duration exposedListCacheControl) {
@@ -90,6 +92,7 @@ public class GaenV2Controller {
     this.validationUtils = validationUtils;
     this.fakeKeyService = fakeKeyService;
     this.gaenSigner = gaenSigner;
+    this.dataService = dataService;
     this.releaseBucketDuration = releaseBucketDuration;
     this.requestTime = requestTime;
     this.exposedListCacheControl = exposedListCacheControl;
@@ -187,8 +190,18 @@ public class GaenV2Controller {
       return ResponseEntity.notFound().build();
     }
     UTCInstant publishedUntil = now.roundToBucketStart(releaseBucketDuration);
-    // TODO: get keys based on countries
-    var exposedKeys = new ArrayList<GaenKey>();
+    String theCountry = "";
+    for (var c : country) {
+      // TODO: What is padding?shall we take the first, or fail if multiple are there?
+      if (c != "XX") {
+        theCountry = c;
+        break;
+      }
+    }
+    // TODO: what about keysSince? Mapping should still be per keyDate?
+    var exposedKeys =
+        dataService.getSortedExposedForKeyDate(
+            keysSince, new CountryShareConfiguration(theCountry, 0), null, publishedUntil, now);
 
     // TODO We need padding
 
