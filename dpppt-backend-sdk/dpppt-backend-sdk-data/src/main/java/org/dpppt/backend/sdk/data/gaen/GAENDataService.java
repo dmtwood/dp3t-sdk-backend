@@ -12,6 +12,7 @@ package org.dpppt.backend.sdk.data.gaen;
 
 import java.time.Duration;
 import java.util.List;
+import org.dpppt.backend.sdk.model.gaen.CountryShareConfiguration;
 import org.dpppt.backend.sdk.model.gaen.GaenKey;
 import org.dpppt.backend.sdk.utils.UTCInstant;
 
@@ -21,8 +22,20 @@ public interface GAENDataService {
    * Upserts (Update or Inserts) the given list of exposed keys
    *
    * @param keys the list of exposed keys to upsert
+   * @param visitedCountries the list of visited countries
    * @param now time of the request
    */
+  void upsertExposees(
+      List<GaenKey> keys, List<CountryShareConfiguration> visitedCountries, UTCInstant now);
+
+  /**
+   * <b> DEPRECATED use upsertExposees(keys, visitedCountries, now) </b> <br>
+   * Upserts (Update or Inserts) the given list of exposed keys
+   *
+   * @param keys the list of exposed keys to upsert
+   * @param now time of the request
+   */
+  @Deprecated
   void upsertExposees(List<GaenKey> keys, UTCInstant now);
 
   /**
@@ -34,9 +47,11 @@ public interface GAENDataService {
    *     to next bucket)
    * @param now time of the request
    */
+  @Deprecated
   void upsertExposeesDelayed(List<GaenKey> keys, UTCInstant delayedReceivedAt, UTCInstant now);
 
   /**
+   * <b> DEPRECATED use the method needing a country</b> <br>
    * Returns all exposeed keys for the given batch, where a batch is parametrized with keyDate (for
    * which day was the key used) publishedAfter/publishedUntil (when was the key published) and now
    * (has the key expired or not, based on rollingStartNumber and rollingPeriod).
@@ -47,8 +62,28 @@ public interface GAENDataService {
    * @param now the start of the query
    * @return all exposeed keys for the given batch
    */
+  @Deprecated
   List<GaenKey> getSortedExposedForKeyDate(
       UTCInstant keyDate, UTCInstant publishedAfter, UTCInstant publishedUntil, UTCInstant now);
+
+  /**
+   * Returns all exposeed keys for the given batch, where a batch is parametrized with keyDate (for
+   * which day was the key used) publishedAfter/publishedUntil (when was the key published) and now
+   * (has the key expired or not, based on rollingStartNumber and rollingPeriod).
+   *
+   * @param keyDate must be midnight UTC
+   * @param forCountry getKeysForCountry
+   * @param publishedAfter when publication should start
+   * @param publishedUntil last publication
+   * @param now the start of the query
+   * @return all exposeed keys for the given batch
+   */
+  List<GaenKey> getSortedExposedForKeyDate(
+      UTCInstant keyDate,
+      CountryShareConfiguration forCountry,
+      UTCInstant publishedAfter,
+      UTCInstant publishedUntil,
+      UTCInstant now);
 
   /**
    * deletes entries older than retentionperiod

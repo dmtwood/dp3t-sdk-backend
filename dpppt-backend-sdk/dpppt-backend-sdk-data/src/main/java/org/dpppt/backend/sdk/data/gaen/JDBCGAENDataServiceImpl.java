@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
+import org.dpppt.backend.sdk.model.gaen.CountryShareConfiguration;
 import org.dpppt.backend.sdk.model.gaen.GaenKey;
 import org.dpppt.backend.sdk.utils.UTCInstant;
 import org.slf4j.Logger;
@@ -30,7 +31,8 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
   private final String dbType;
   private final NamedParameterJdbcTemplate jt;
   private final Duration releaseBucketDuration;
-  // Time skew means the duration for how long a key still is valid __after__ it has expired (e.g 2h
+  // Time skew means the duration for how long a key still is valid __after__ it
+  // has expired (e.g 2h
   // for now
   // https://developer.apple.com/documentation/exposurenotification/setting_up_a_key_server?language=objc)
   private final Duration timeSkew;
@@ -103,10 +105,13 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
             + " from t_gaen_exposed where rolling_start_number >= :rollingPeriodStartNumberStart"
             + " and rolling_start_number < :rollingPeriodStartNumberEnd and received_at <"
             + " :publishedUntil";
-    // we need to subtract the time skew since we want to release it iff rolling_start_number +
+    // we need to subtract the time skew since we want to release it iff
+    // rolling_start_number +
     // rolling_period + timeSkew < NOW
-    // note though that since we use `<` instead of `<=` a key which is valid until 24:00 will be
-    // accepted until 02:00 (by the clients, so we MUST NOT release it before 02:00), but 02:00 lies
+    // note though that since we use `<` instead of `<=` a key which is valid until
+    // 24:00 will be
+    // accepted until 02:00 (by the clients, so we MUST NOT release it before
+    // 02:00), but 02:00 lies
     // in the bucket of 04:00. So the key will be released
     // earliest 04:00.
     params.addValue(
@@ -114,7 +119,8 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
         now.roundToBucketStart(releaseBucketDuration).minus(timeSkew).get10MinutesSince1970());
     sql += " and rolling_start_number + rolling_period < :maxAllowedStartNumber";
 
-    // note that received_at is always rounded to `next_bucket` - 1ms to difuse actual upload time
+    // note that received_at is always rounded to `next_bucket` - 1ms to difuse
+    // actual upload time
     if (publishedAfter != null) {
       params.addValue("publishedAfter", publishedAfter.getDate());
       sql += " and received_at >= :publishedAfter";
@@ -134,5 +140,87 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
         new MapSqlParameterSource("retention_time", retentionTime.getDate());
     String sqlExposed = "delete from t_gaen_exposed where received_at < :retention_time";
     jt.update(sqlExposed, params);
+  }
+
+  @Override
+  public void upsertExposees(
+      List<GaenKey> keys, List<CountryShareConfiguration> visitedCountries, UTCInstant now) {
+    String sql = null;
+    if (dbType.equals(PGSQL)) {
+      sql =
+          "insert into t_gaen_exposed (key, rolling_start_number, rolling_period,"
+              + " transmission_risk_level, received_at) values (:key, :rolling_start_number,"
+              + " :rolling_period, :transmission_risk_level, :received_at) on conflict on"
+              + " constraint gaen_exposed_key do nothing";
+    } else {
+      sql =
+          "merge into t_gaen_exposed using (values(cast(:key as varchar(24)),"
+              + " :rolling_start_number, :rolling_period, :transmission_risk_level, :received_at))"
+              + " as vals(key, rolling_start_number, rolling_period, transmission_risk_level,"
+              + " received_at) on t_gaen_exposed.key = vals.key when not matched then insert (key,"
+              + " rolling_start_number, rolling_period, transmission_risk_level, received_at)"
+              + " values (vals.key, vals.rolling_start_number, vals.rolling_period,"
+              + " transmission_risk_level, vals.received_at)";
+    }
+    var parameterList = new ArrayList<MapSqlParameterSource>();
+    // Calculate the `receivedAt` just at the end of the current releaseBucket.
+    var receivedAt = now.roundToNextBucket(releaseBucketDuration).minus(Duration.ofMillis(1));
+    for (var gaenKey : keys) {
+      MapSqlParameterSource params = new MapSqlParameterSource();
+      params.addValue("key", gaenKey.getKeyData());
+      params.addValue("rolling_start_number", gaenKey.getRollingStartNumber());
+      params.addValue("rolling_period", gaenKey.getRollingPeriod());
+      params.addValue("transmission_risk_level", gaenKey.getTransmissionRiskLevel());
+      params.addValue("received_at", receivedAt.getDate());
+
+      parameterList.add(params);
+    }
+    jt.batchUpdate(sql, parameterList.toArray(new MapSqlParameterSource[0]));
+  }
+
+  @Override
+  public List<GaenKey> getSortedExposedForKeyDate(
+      UTCInstant keyDate,
+      CountryShareConfiguration forCountry,
+      UTCInstant publishedAfter,
+      UTCInstant publishedUntil,
+      UTCInstant now) {
+    MapSqlParameterSource params = new MapSqlParameterSource();
+    params.addValue("rollingPeriodStartNumberStart", keyDate.get10MinutesSince1970());
+    params.addValue("rollingPeriodStartNumberEnd", keyDate.plusDays(1).get10MinutesSince1970());
+    params.addValue("publishedUntil", publishedUntil.getDate());
+    params.addValue("country", forCountry.getCountryCode());
+
+    String sql =
+        "select pk_exposed_id, key, rolling_start_number, rolling_period, received_at, origin,"
+            + " report_type, days_since_onset_of_symptoms from t_gaen_exposed keys where"
+            + " rolling_start_number >= :rollingPeriodStartNumberStart and rolling_start_number <"
+            + " :rollingPeriodStartNumberEnd and received_at < :publishedUntil left join t_visited"
+            + " country on country.pfk_exposed_id = keys.pk_exposed_id where country.country ="
+            + " :country";
+    // we need to subtract the time skew since we want to release it iff
+    // rolling_start_number +
+    // rolling_period + timeSkew < NOW
+    // note though that since we use `<` instead of `<=` a key which is valid until
+    // 24:00 will be
+    // accepted until 02:00 (by the clients, so we MUST NOT release it before
+    // 02:00), but 02:00 lies
+    // in the bucket of 04:00. So the key will be released
+    // earliest 04:00.
+    params.addValue(
+        "maxAllowedStartNumber",
+        now.roundToBucketStart(releaseBucketDuration).minus(timeSkew).get10MinutesSince1970());
+    sql += " and rolling_start_number + rolling_period < :maxAllowedStartNumber";
+
+    // note that received_at is always rounded to `next_bucket` - 1ms to difuse
+    // actual upload time
+    if (publishedAfter != null) {
+      params.addValue("publishedAfter", publishedAfter.getDate());
+      sql += " and received_at >= :publishedAfter";
+    }
+
+    sql += " order by pk_exposed_id desc";
+
+    return jt.query(sql, params, new GaenKeyRowMapper());
   }
 }
