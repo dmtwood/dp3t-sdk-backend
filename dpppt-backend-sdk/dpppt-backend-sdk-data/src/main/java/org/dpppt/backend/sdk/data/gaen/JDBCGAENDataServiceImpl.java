@@ -146,36 +146,83 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
   public void upsertExposees(
       List<GaenKey> keys, List<CountryShareConfiguration> visitedCountries, UTCInstant now) {
     String sql = null;
+    String visitedCountrySql = null;
     if (dbType.equals(PGSQL)) {
       sql =
-          "insert into t_gaen_exposed (key, rolling_start_number, rolling_period,"
-              + " transmission_risk_level, received_at) values (:key, :rolling_start_number,"
-              + " :rolling_period, :transmission_risk_level, :received_at) on conflict on"
-              + " constraint gaen_exposed_key do nothing";
+          "insert into t_gaen_exposed (pk_exposed_id, key, rolling_start_number, rolling_period,"
+              + " transmission_risk_level, origin, report_type, days_since_onset_of_symptoms,"
+              + " received_at) values (:pk_exposed_id,:key, :rolling_start_number, :rolling_period,"
+              + " :transmission_risk_level, :origin, :report_type, :days_since_onset_of_symptoms,"
+              + " :received_at) on conflict on constraint gaen_exposed_key do nothing";
+
+      visitedCountrySql =
+          "insert into t_visited (pkf_exposed_id, country) values (:pkf_exposed_id, :country) on"
+              + " conflict do nothing";
     } else {
       sql =
-          "merge into t_gaen_exposed using (values(cast(:key as varchar(24)),"
-              + " :rolling_start_number, :rolling_period, :transmission_risk_level, :received_at))"
-              + " as vals(key, rolling_start_number, rolling_period, transmission_risk_level,"
-              + " received_at) on t_gaen_exposed.key = vals.key when not matched then insert (key,"
-              + " rolling_start_number, rolling_period, transmission_risk_level, received_at)"
-              + " values (vals.key, vals.rolling_start_number, vals.rolling_period,"
-              + " transmission_risk_level, vals.received_at)";
+          "merge into t_gaen_exposed using (values(:pk_exposed_id, cast(:key as varchar(24)),"
+              + " :rolling_start_number, :rolling_period, :transmission_risk_level, :origin,"
+              + " :report_type, :days_since_onset_of_symptoms, :received_at)) as"
+              + " vals(pk_exposed_id,key, rolling_start_number, rolling_period,"
+              + " transmission_risk_level,origin, report_type, days_since_onset_of_symptoms,"
+              + " received_at) on t_gaen_exposed.key = vals.key when not matched then insert"
+              + " (pk_exposed_id,key, rolling_start_number, rolling_period,"
+              + " transmission_risk_level,origin, report_type, days_since_onset_of_symptoms,"
+              + " received_at) values (vals.pk_exposed_id,vals.key, vals.rolling_start_number,"
+              + " vals.rolling_period, transmission_risk_level,vals.origin, vals.report_type,"
+              + " vals.days_since_onset_of_symptoms, vals.received_at)";
+      visitedCountrySql =
+          "merge into t_visited using (values(:pkf_exposed_id, :country)) as vals(pkf_exposed_id,"
+              + " country) on t_visited.pkf_exposed_id = vals.pkf_exposed_id when not matched then"
+              + " insert (pkf_exposed_id, country) values (vals.pkf_exposed_id, vals.country)";
     }
     var parameterList = new ArrayList<MapSqlParameterSource>();
+    var visitedCountriesList = new ArrayList<MapSqlParameterSource>();
     // Calculate the `receivedAt` just at the end of the current releaseBucket.
     var receivedAt = now.roundToNextBucket(releaseBucketDuration).minus(Duration.ofMillis(1));
+    // reserve a block of ids for our insert
+    var first_index = reserveSequenceBlock(keys.size());
+    Integer index = first_index;
     for (var gaenKey : keys) {
       MapSqlParameterSource params = new MapSqlParameterSource();
+
+      params.addValue("pk_exposed_id", index);
+      for (var country : visitedCountries) {
+        MapSqlParameterSource visitedCountryParams = new MapSqlParameterSource();
+        visitedCountryParams.addValue("pkf_exposed_id", index);
+        visitedCountryParams.addValue("country", country.getCountryCode());
+        visitedCountriesList.add(visitedCountryParams);
+      }
+      // update the index with + 1
+      index += 1;
+
       params.addValue("key", gaenKey.getKeyData());
       params.addValue("rolling_start_number", gaenKey.getRollingStartNumber());
       params.addValue("rolling_period", gaenKey.getRollingPeriod());
       params.addValue("transmission_risk_level", gaenKey.getTransmissionRiskLevel());
+      params.addValue("origin", gaenKey.getOrigin());
+      params.addValue("report_type", gaenKey.getReportType());
+      params.addValue("days_since_onset_of_symptoms", gaenKey.getDaysSinceOnsetOfSymptoms());
       params.addValue("received_at", receivedAt.getDate());
 
       parameterList.add(params);
     }
     jt.batchUpdate(sql, parameterList.toArray(new MapSqlParameterSource[0]));
+    jt.batchUpdate(visitedCountrySql, visitedCountriesList.toArray(new MapSqlParameterSource[0]));
+  }
+
+  @Transactional(readOnly = false)
+  Integer reserveSequenceBlock(int numberOfElements) {
+    String sql = "SELECT last_value from t_gaen_exposed_pk_exposed_id_seq";
+    String updateSequence = "SELECT setval('t_gaen_exposed_pk_exposed_id_seq', :new_value)";
+    var params = new MapSqlParameterSource();
+
+    Integer firstValue = jt.queryForObject(sql, new MapSqlParameterSource(), Integer.class);
+    Integer lastValue = firstValue + numberOfElements;
+    params.addValue("new_value", lastValue);
+    jt.update(updateSequence, params);
+
+    return firstValue + 1;
   }
 
   @Override
@@ -192,7 +239,7 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
     params.addValue("country", forCountry.getCountryCode());
 
     String sql =
-        "select pk_exposed_id, key, rolling_start_number, rolling_period, received_at, origin,"
+        "select pk_exposed_id, key, rolling_start_number, rolling_period, origin,"
             + " report_type, days_since_onset_of_symptoms from t_gaen_exposed keys where"
             + " rolling_start_number >= :rollingPeriodStartNumberStart and rolling_start_number <"
             + " :rollingPeriodStartNumberEnd and received_at < :publishedUntil left join t_visited"

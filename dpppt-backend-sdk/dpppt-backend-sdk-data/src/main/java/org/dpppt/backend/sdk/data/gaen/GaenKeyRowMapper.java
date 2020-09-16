@@ -13,7 +13,10 @@ public class GaenKeyRowMapper implements RowMapper<GaenKey> {
     gaenKey.setKeyData(rs.getString("key"));
     gaenKey.setRollingStartNumber(rs.getInt("rolling_start_number"));
     gaenKey.setRollingPeriod(rs.getInt("rolling_period"));
-    gaenKey.setTransmissionRiskLevel(rs.getInt("transmission_risk_level"));
+    gaenKey.setTransmissionRiskLevel(0);
+    gaenKey.setReportType(rs.getString("report_type"));
+    gaenKey.setOrigin(rs.getString("origin"));
+    gaenKey.setDaysSinceOnsetOfSymptoms(rs.getInt("days_since_onset_of_symptoms"));
     return gaenKey;
   }
 }

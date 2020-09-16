@@ -47,6 +47,29 @@ public class GaenKey {
       example = "1")
   private Integer fake = 0;
 
+  @Documentation(
+      description =
+          "The country code from where this key came from. Note: for the upload this is not"
+              + " needed, as all keys upload through the backend come from a specific region.",
+      example = "CH")
+  private String origin = "CH";
+
+  @Documentation(
+      description =
+          "How the key was reported (e.g. is it a authenticated result from a positive test). If"
+              + " there are no different possibilities, this can omitted and will be set when"
+              + " downloading the keys. C.f. ReportType.java",
+      example = "")
+  private String reportType = ReportType.CONFIRMED_TEST.name();
+
+  @Documentation(
+      description =
+          "Days since the offset of symptoms. If the health authority has a fixed number of days,"
+              + " which are subtracted, this can be omitted",
+      example = "1")
+  // TODO: what is the correct value
+  private Integer daysSinceOnsetOfSymptoms = 5;
+
   public GaenKey() {}
 
   public GaenKey(
@@ -84,10 +107,12 @@ public class GaenKey {
     this.rollingPeriod = rollingPeriod;
   }
 
+  @Deprecated
   public Integer getTransmissionRiskLevel() {
     return this.transmissionRiskLevel;
   }
 
+  @Deprecated
   public void setTransmissionRiskLevel(Integer transmissionRiskLevel) {
     this.transmissionRiskLevel = transmissionRiskLevel;
   }
@@ -98,5 +123,29 @@ public class GaenKey {
 
   public void setFake(Integer fake) {
     this.fake = fake;
+  }
+
+  public String getOrigin() {
+    return this.origin;
+  }
+
+  public void setOrigin(String origin) {
+    this.origin = origin;
+  }
+
+  public String getReportType() {
+    return this.reportType;
+  }
+
+  public void setReportType(String reportType) {
+    this.reportType = reportType;
+  }
+
+  public Integer getDaysSinceOnsetOfSymptoms() {
+    return this.daysSinceOnsetOfSymptoms;
+  }
+
+  public void setDaysSinceOnsetOfSymptoms(Integer daysSinceOnsetOfSymptoms) {
+    this.daysSinceOnsetOfSymptoms = daysSinceOnsetOfSymptoms;
   }
 }
