@@ -104,12 +104,18 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
     params.addValue("rollingPeriodStartNumberStart", keyDate.get10MinutesSince1970());
     params.addValue("rollingPeriodStartNumberEnd", keyDate.plusDays(1).get10MinutesSince1970());
     params.addValue("publishedUntil", publishedUntil.getDate());
+    // for v1 we don't have different countries, so we only want keys which were used n
+    // origin_country
+    params.addValue("origin_country", originCountry);
 
     String sql =
         "select pk_exposed_id, key, rolling_start_number, rolling_period"
-            + " from t_gaen_exposed where rolling_start_number >= :rollingPeriodStartNumberStart"
-            + " and rolling_start_number < :rollingPeriodStartNumberEnd and received_at <"
-            + " :publishedUntil";
+            + " from t_gaen_exposed key"
+            + " inner join t_visited country on country.pfk_exposed_id = key.pk_exposed_id "
+            + " where key.rolling_start_number >= :rollingPeriodStartNumberStart"
+            + " and key.rolling_start_number < :rollingPeriodStartNumberEnd and key.received_at <"
+            + " :publishedUntil"
+            + " and country.country = :origin_country";
     // we need to subtract the time skew since we want to release it iff
     // rolling_start_number +
     // rolling_period + timeSkew < NOW
@@ -122,16 +128,16 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
     params.addValue(
         "maxAllowedStartNumber",
         now.roundToBucketStart(releaseBucketDuration).minus(timeSkew).get10MinutesSince1970());
-    sql += " and rolling_start_number + rolling_period < :maxAllowedStartNumber";
+    sql += " and key.rolling_start_number + key.rolling_period < :maxAllowedStartNumber";
 
     // note that received_at is always rounded to `next_bucket` - 1ms to difuse
     // actual upload time
     if (publishedAfter != null) {
       params.addValue("publishedAfter", publishedAfter.getDate());
-      sql += " and received_at >= :publishedAfter";
+      sql += " and key.received_at >= :publishedAfter";
     }
 
-    sql += " order by pk_exposed_id desc";
+    sql += " order by key.pk_exposed_id desc";
 
     return jt.query(sql, params, new GaenKeyRowMapper());
   }
@@ -163,12 +169,12 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
         "select distinct pk_exposed_id, key, rolling_start_number, rolling_period"
             + " from (select *, TO_TIMESTAMP((rolling_start_number +"
             + " rolling_period) * 10 * 60 * 1000 + :timeSkewMillis) as expiry from t_gaen_exposed)"
-            + " keys inner join t_visited country on country.pfk_exposed_id = keys.pk_exposed_id"
-            + " where country.country in (:countries) AND ((keys.received_at >= :since AND"
-            + " keys.received_at < :maxBucket AND keys.expiry <= keys.received_at) OR (keys.expiry"
-            + " >= :since AND keys.expiry < :maxBucket AND keys.expiry > keys.received_at))";
+            + " key inner join t_visited country on country.pfk_exposed_id = key.pk_exposed_id"
+            + " where country.country in (:countries) AND ((key.received_at >= :since AND"
+            + " key.received_at < :maxBucket AND key.expiry <= key.received_at) OR (key.expiry"
+            + " >= :since AND key.expiry < :maxBucket AND key.expiry > key.received_at))";
 
-    sql += " order by pk_exposed_id desc";
+    sql += " order key.by pk_exposed_id desc";
 
     return jt.query(sql, params, new GaenKeyRowMapper());
   }
