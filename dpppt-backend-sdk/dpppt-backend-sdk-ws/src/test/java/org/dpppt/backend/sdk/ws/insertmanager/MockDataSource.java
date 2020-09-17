@@ -10,12 +10,12 @@ import org.dpppt.backend.sdk.utils.UTCInstant;
 public class MockDataSource implements GAENDataService {
 
   @Override
-  public void upsertExposees(List<GaenKey> keys, UTCInstant now) {
+  public void insertExposees(List<GaenKey> keys, UTCInstant now) {
     throw new RuntimeException("UPSERT_EXPOSEES");
   }
 
   @Override
-  public void upsertExposeesDelayed(
+  public void insertExposeesDelayed(
       List<GaenKey> keys, UTCInstant delayedReceivedAt, UTCInstant now) {
     throw new RuntimeException("UPSERT_EXPOSEESDelayed");
   }
@@ -31,19 +31,15 @@ public class MockDataSource implements GAENDataService {
   public void cleanDB(Duration retentionPeriod) {}
 
   @Override
-  public void upsertExposees(
+  public void insertExposees(
       List<GaenKey> keys, List<CountryShareConfiguration> visitedCountries, UTCInstant now) {
     // TODO Auto-generated method stub
 
   }
 
   @Override
-  public List<GaenKey> getSortedExposedForKeyDate(
-      UTCInstant keyDate,
-      CountryShareConfiguration forCountry,
-      UTCInstant publishedAfter,
-      UTCInstant publishedUntil,
-      UTCInstant now) {
+  public List<GaenKey> getSortedExposedSince(
+      UTCInstant since, List<String> forCountries, UTCInstant now) {
     // TODO Auto-generated method stub
     return null;
   }

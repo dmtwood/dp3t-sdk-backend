@@ -36,6 +36,9 @@ public class DPPPTDataServiceConfig {
   @Value("${ws.exposedlist.releaseBucketDuration: 7200000}")
   long releaseBucketDuration;
 
+  @Value("${ws.origin.country: CH}")
+  String originCountry;
+
   // @Value("${ws.app.gaen.timeskew:PT2h}")
   Duration timeSkew = Duration.ofHours(2);
 
@@ -59,7 +62,7 @@ public class DPPPTDataServiceConfig {
   @Bean
   public GAENDataService gaenDataService() {
     return new JDBCGAENDataServiceImpl(
-        dbType, dataSource, Duration.ofMillis(releaseBucketDuration), timeSkew);
+        dbType, dataSource, Duration.ofMillis(releaseBucketDuration), timeSkew, originCountry);
   }
 
   @Bean
@@ -70,7 +73,11 @@ public class DPPPTDataServiceConfig {
   @Bean
   public GAENDataService fakeService() {
     return new JDBCGAENDataServiceImpl(
-        "hsql", fakeDataSource(), Duration.ofMillis(releaseBucketDuration), timeSkew);
+        "hsql",
+        fakeDataSource(),
+        Duration.ofMillis(releaseBucketDuration),
+        timeSkew,
+        originCountry);
   }
 
   @Bean

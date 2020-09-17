@@ -13,7 +13,6 @@ import java.util.concurrent.Callable;
 import javax.validation.Valid;
 import org.dpppt.backend.sdk.data.gaen.FakeKeyService;
 import org.dpppt.backend.sdk.data.gaen.GAENDataService;
-import org.dpppt.backend.sdk.model.gaen.CountryShareConfiguration;
 import org.dpppt.backend.sdk.model.gaen.GaenV2UploadKeysRequest;
 import org.dpppt.backend.sdk.utils.DurationExpiredException;
 import org.dpppt.backend.sdk.utils.UTCInstant;
@@ -190,18 +189,8 @@ public class GaenV2Controller {
       return ResponseEntity.notFound().build();
     }
     UTCInstant publishedUntil = now.roundToBucketStart(releaseBucketDuration);
-    String theCountry = "";
-    for (var c : country) {
-      // TODO: What is padding?shall we take the first, or fail if multiple are there?
-      if (c != "XX") {
-        theCountry = c;
-        break;
-      }
-    }
-    // TODO: what about keysSince? Mapping should still be per keyDate?
-    var exposedKeys =
-        dataService.getSortedExposedForKeyDate(
-            keysSince, new CountryShareConfiguration(theCountry, 0), null, publishedUntil, now);
+
+    var exposedKeys = dataService.getSortedExposedSince(keysSince, country, now);
 
     // TODO We need padding
 

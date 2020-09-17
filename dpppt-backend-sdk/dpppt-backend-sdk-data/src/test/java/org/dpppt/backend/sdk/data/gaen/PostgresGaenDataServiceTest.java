@@ -175,7 +175,7 @@ public class PostgresGaenDataServiceTest {
     tmpKey.setTransmissionRiskLevel(0);
     List<GaenKey> keys = List.of(tmpKey);
 
-    gaenDataService.upsertExposees(keys, UTCInstant.now());
+    gaenDataService.insertExposees(keys, UTCInstant.now());
 
     var now = UTCInstant.now();
     // calculate exposed until bucket, but get bucket in the future, as keys have

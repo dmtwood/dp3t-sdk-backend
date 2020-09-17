@@ -112,7 +112,7 @@ public class InsertManager {
     if (internalKeys.isEmpty() || validationUtils.jwtIsFake(principal)) {
       return;
     } else {
-      dataService.upsertExposees(internalKeys, now);
+      dataService.insertExposees(internalKeys, now);
     }
   }
   /**

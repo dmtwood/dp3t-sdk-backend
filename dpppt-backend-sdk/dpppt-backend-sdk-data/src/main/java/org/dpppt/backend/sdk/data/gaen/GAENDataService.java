@@ -25,7 +25,7 @@ public interface GAENDataService {
    * @param visitedCountries the list of visited countries
    * @param now time of the request
    */
-  void upsertExposees(
+  void insertExposees(
       List<GaenKey> keys, List<CountryShareConfiguration> visitedCountries, UTCInstant now);
 
   /**
@@ -36,7 +36,7 @@ public interface GAENDataService {
    * @param now time of the request
    */
   @Deprecated
-  void upsertExposees(List<GaenKey> keys, UTCInstant now);
+  void insertExposees(List<GaenKey> keys, UTCInstant now);
 
   /**
    * Upserts (Update or Inserts) the given list of exposed keys, with delayed release of same day
@@ -48,7 +48,7 @@ public interface GAENDataService {
    * @param now time of the request
    */
   @Deprecated
-  void upsertExposeesDelayed(List<GaenKey> keys, UTCInstant delayedReceivedAt, UTCInstant now);
+  void insertExposeesDelayed(List<GaenKey> keys, UTCInstant delayedReceivedAt, UTCInstant now);
 
   /**
    * <b> DEPRECATED use the method needing a country</b> <br>
@@ -72,18 +72,13 @@ public interface GAENDataService {
    * (has the key expired or not, based on rollingStartNumber and rollingPeriod).
    *
    * @param keyDate must be midnight UTC
-   * @param forCountry getKeysForCountry
+   * @param forCountries return keys for the specified countries
    * @param publishedAfter when publication should start
    * @param publishedUntil last publication
    * @param now the start of the query
    * @return all exposeed keys for the given batch
    */
-  List<GaenKey> getSortedExposedForKeyDate(
-      UTCInstant keyDate,
-      CountryShareConfiguration forCountry,
-      UTCInstant publishedAfter,
-      UTCInstant publishedUntil,
-      UTCInstant now);
+  List<GaenKey> getSortedExposedSince(UTCInstant since, List<String> forCountries, UTCInstant now);
 
   /**
    * deletes entries older than retentionperiod
