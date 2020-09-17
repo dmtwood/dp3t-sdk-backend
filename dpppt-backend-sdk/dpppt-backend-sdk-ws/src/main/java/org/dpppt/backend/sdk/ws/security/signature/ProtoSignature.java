@@ -39,6 +39,10 @@ public class ProtoSignature {
     0x45, 0x4B, 0x20, 0x45, 0x78, 0x70, 0x6F, 0x72, 0x74, 0x20, 0x76, 0x31, 0x20, 0x20, 0x20, 0x20
   }; // "EK Export v1    "
 
+  // TODO: make does to configurable
+  private final ReportType reportType = ReportType.CONFIRMED_TEST;
+  private final int daysSinceOnset = 0;
+
   private final String algorithm;
   private final KeyPair keyPair;
   private final String appBundleId;
@@ -347,9 +351,8 @@ public class ProtoSignature {
               .setKeyData(ByteString.copyFrom(Base64.getDecoder().decode(key.getKeyData())))
               .setRollingPeriod(key.getRollingPeriod())
               .setRollingStartIntervalNumber(key.getRollingStartNumber())
-              .setReportType(ReportType.CONFIRMED_TEST)
-              // TODO: placeholder for know
-              .setDaysSinceOnsetOfSymptoms(key.getDaysSinceOnsetOfSymptoms())
+              .setReportType(reportType)
+              .setDaysSinceOnsetOfSymptoms(daysSinceOnset)
               .build();
       tekList.add(protoKey);
     }
