@@ -183,6 +183,7 @@
 				<version>2.19.1</version>
 				<configuration>
 					<forkCount>1</forkCount>
+					<argLine>-Dws.origin.country=CH</argLine>
 				</configuration>
 			</plugin>
 
