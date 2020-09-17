@@ -24,7 +24,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.jsonwebtoken.Jwt;
 import io.jsonwebtoken.Jwts;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -44,9 +43,6 @@ import org.dpppt.backend.sdk.data.gaen.GAENDataService;
 import org.dpppt.backend.sdk.model.gaen.GaenKey;
 import org.dpppt.backend.sdk.model.gaen.GaenRequest;
 import org.dpppt.backend.sdk.model.gaen.GaenSecondDay;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat.TEKSignatureList;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat.TemporaryExposureKeyExport;
 import org.dpppt.backend.sdk.utils.UTCInstant;
 import org.dpppt.backend.sdk.ws.security.KeyVault;
 import org.dpppt.backend.sdk.ws.security.signature.ProtoSignature;
@@ -1126,13 +1122,7 @@ public class GaenControllerTest extends BaseControllerTest {
       keys.add(tmpKey);
     }
 
-    Map<Integer, Boolean> tests =
-        Map.of(
-            -2, false,
-            -1, true,
-            0, true,
-            1, true,
-            2, false);
+    Map<Integer, Boolean> tests = Map.of(-2, false, -1, true, 0, true, 1, true, 2, false);
 
     for (Map.Entry<Integer, Boolean> t : tests.entrySet()) {
       Integer offset = t.getKey();
@@ -1466,7 +1456,7 @@ public class GaenControllerTest extends BaseControllerTest {
   /** Verifies a zip response, checks if keys and signature is correct. */
   private void verifyZipResponse(
       MockHttpServletResponse response, int expectKeyCount, int expectedRollingPeriod)
-      throws IOException, NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+      throws Exception {
     ByteArrayInputStream baisZip = new ByteArrayInputStream(response.getContentAsByteArray());
     ZipInputStream keyZipInputstream = new ZipInputStream(baisZip);
     verifyKeyZip(keyZipInputstream, expectKeyCount, expectedRollingPeriod);
@@ -1474,7 +1464,13 @@ public class GaenControllerTest extends BaseControllerTest {
 
   private void verifyKeyZip(
       ZipInputStream keyZipInputstream, int expectKeyCount, int expectedRollingPeriod)
-      throws IOException, NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+      throws Exception {
+    verifyKeyZip(keyZipInputstream, expectKeyCount, expectedRollingPeriod, false);
+  }
+
+  private void verifyKeyZip(
+      ZipInputStream keyZipInputstream, int expectKeyCount, int expectedRollingPeriod, boolean isV2)
+      throws Exception {
     ZipEntry entry = keyZipInputstream.getNextEntry();
     boolean foundData = false;
     boolean foundSignature = false;
@@ -1496,26 +1492,70 @@ public class GaenControllerTest extends BaseControllerTest {
       }
       entry = keyZipInputstream.getNextEntry();
     }
-
+    if (isV2) {
+      verifyV2(keyProto, exportBin, signatureProto, expectedRollingPeriod, expectKeyCount);
+    } else {
+      verifyV1(keyProto, exportBin, signatureProto, expectedRollingPeriod, expectKeyCount);
+    }
     assertTrue(foundData, "export.bin not found in zip");
     assertTrue(foundSignature, "export.sig not found in zip");
+  }
 
-    TEKSignatureList list = TemporaryExposureKeyFormat.TEKSignatureList.parseFrom(signatureProto);
-    TemporaryExposureKeyExport export =
-        TemporaryExposureKeyFormat.TemporaryExposureKeyExport.parseFrom(keyProto);
+  private void verifyV1(
+      byte[] keyProto,
+      byte[] exportBin,
+      byte[] signatureProto,
+      int expectedRollingPeriod,
+      int expectKeyCount)
+      throws Exception {
+    var list =
+        org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat.TEKSignatureList
+            .parseFrom(signatureProto);
+    var export =
+        org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat
+            .TemporaryExposureKeyExport.parseFrom(keyProto);
     for (var key : export.getKeysList()) {
       assertEquals(expectedRollingPeriod, key.getRollingPeriod());
     }
     var sig = list.getSignatures(0);
-    java.security.Signature signatureVerifier =
-        java.security.Signature.getInstance(sig.getSignatureInfo().getSignatureAlgorithm().trim());
+    verifySignature(
+        sig.getSignatureInfo().getSignatureAlgorithm().trim(),
+        exportBin,
+        sig.getSignature().toByteArray());
+    assertEquals(expectKeyCount, export.getKeysCount());
+  }
+
+  private void verifyV2(
+      byte[] keyProto,
+      byte[] exportBin,
+      byte[] signatureProto,
+      int expectedRollingPeriod,
+      int expectKeyCount)
+      throws Exception {
+    var list =
+        org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.TEKSignatureList
+            .parseFrom(signatureProto);
+    var export =
+        org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat
+            .TemporaryExposureKeyExport.parseFrom(keyProto);
+    for (var key : export.getKeysList()) {
+      assertEquals(expectedRollingPeriod, key.getRollingPeriod());
+    }
+    var sig = list.getSignatures(0);
+    verifySignature(
+        sig.getSignatureInfo().getSignatureAlgorithm().trim(),
+        exportBin,
+        sig.getSignature().toByteArray());
+    assertEquals(expectKeyCount, export.getKeysCount());
+  }
+
+  private void verifySignature(String algorithm, byte[] data, byte[] signature)
+      throws InvalidKeyException, NoSuchAlgorithmException, SignatureException {
+    java.security.Signature signatureVerifier = java.security.Signature.getInstance(algorithm);
     signatureVerifier.initVerify(signer.getPublicKey());
 
-    signatureVerifier.update(exportBin);
-    assertTrue(
-        signatureVerifier.verify(sig.getSignature().toByteArray()),
-        "Could not verify signature in zip file");
-    assertEquals(expectKeyCount, export.getKeysCount());
+    signatureVerifier.update(data);
+    assertTrue(signatureVerifier.verify(signature), "Could not verify signature in zip file");
   }
 
   /**

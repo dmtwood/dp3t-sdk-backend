@@ -112,7 +112,7 @@ public class DebugController {
         dataService.getSortedExposedForBatchReleaseTime(
             batchReleaseTimeDuration.toMillis(), releaseBucketDuration.toMillis());
 
-    byte[] payload = gaenSigner.getPayload(exposedKeys);
+    byte[] payload = gaenSigner.getPayload(exposedKeys, false);
 
     return ResponseEntity.ok()
         .header("X-BATCH-RELEASE-TIME", Long.toString(batchReleaseTimeDuration.toMillis()))

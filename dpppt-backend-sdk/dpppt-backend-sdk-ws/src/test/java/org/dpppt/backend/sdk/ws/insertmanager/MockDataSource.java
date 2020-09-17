@@ -3,6 +3,7 @@ package org.dpppt.backend.sdk.ws.insertmanager;
 import java.time.Duration;
 import java.util.List;
 import org.dpppt.backend.sdk.data.gaen.GAENDataService;
+import org.dpppt.backend.sdk.model.gaen.CountryShareConfiguration;
 import org.dpppt.backend.sdk.model.gaen.GaenKey;
 import org.dpppt.backend.sdk.utils.UTCInstant;
 
@@ -28,4 +29,22 @@ public class MockDataSource implements GAENDataService {
 
   @Override
   public void cleanDB(Duration retentionPeriod) {}
+
+  @Override
+  public void upsertExposees(
+      List<GaenKey> keys, List<CountryShareConfiguration> visitedCountries, UTCInstant now) {
+    // TODO Auto-generated method stub
+
+  }
+
+  @Override
+  public List<GaenKey> getSortedExposedForKeyDate(
+      UTCInstant keyDate,
+      CountryShareConfiguration forCountry,
+      UTCInstant publishedAfter,
+      UTCInstant publishedUntil,
+      UTCInstant now) {
+    // TODO Auto-generated method stub
+    return null;
+  }
 }

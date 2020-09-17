@@ -293,7 +293,7 @@ public class GaenController {
           .build();
     }
 
-    ProtoSignatureWrapper payload = gaenSigner.getPayload(exposedKeys);
+    ProtoSignatureWrapper payload = gaenSigner.getPayloadV1(exposedKeys);
 
     return ResponseEntity.ok()
         .cacheControl(CacheControl.maxAge(exposedListCacheControl))

@@ -211,7 +211,7 @@ public class GaenV2Controller {
           .header("X-PUBLISHED-UNTIL", Long.toString(publishedUntil.getTimestamp()))
           .build();
     }
-    ProtoSignatureWrapper payload = gaenSigner.getPayload(exposedKeys);
+    ProtoSignatureWrapper payload = gaenSigner.getPayloadV1(exposedKeys);
 
     return ResponseEntity.ok()
         .cacheControl(CacheControl.maxAge(exposedListCacheControl))

@@ -30,11 +30,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.dpppt.backend.sdk.model.gaen.GaenKey;
 import org.dpppt.backend.sdk.model.gaen.GaenUnit;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat.SignatureInfo;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat.TemporaryExposureKey;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat.TemporaryExposureKey.Builder;
-import org.dpppt.backend.sdk.model.gaen.proto.TemporaryExposureKeyFormat.TemporaryExposureKey.ReportType;
+import org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.TemporaryExposureKey.ReportType;
 import org.dpppt.backend.sdk.utils.UTCInstant;
 
 public class ProtoSignature {
@@ -73,17 +69,7 @@ public class ProtoSignature {
     this.releaseBucketDuration = releaseBucketDuration;
   }
 
-  /**
-   * Creates a ZIP file containing the given keys and the corresponding signature.
-   *
-   * @param keys
-   * @return
-   * @throws IOException
-   * @throws InvalidKeyException
-   * @throws SignatureException
-   * @throws NoSuchAlgorithmException
-   */
-  public ProtoSignatureWrapper getPayload(List<GaenKey> keys)
+  private ProtoSignatureWrapper getPayload(List<GaenKey> keys, boolean isV2)
       throws IOException, InvalidKeyException, SignatureException, NoSuchAlgorithmException {
     if (keys.isEmpty()) {
       throw new IOException("Keys should not be empty");
@@ -93,7 +79,8 @@ public class ProtoSignature {
     ByteArrayOutputStream hashOut = new ByteArrayOutputStream();
     var digest = MessageDigest.getInstance("SHA256");
     var keyDate = Duration.of(keys.get(0).getRollingStartNumber(), GaenUnit.TenMinutes);
-    var protoFile = getProtoKey(keys, keyDate, false);
+    var protoFile =
+        isV2 ? getProtoKeyV2(keys, keyDate, false) : getProtoKeyV1(keys, keyDate, false);
 
     zip.putNextEntry(new ZipEntry("export.bin"));
     byte[] protoFileBytes = protoFile.toByteArray();
@@ -103,7 +90,7 @@ public class ProtoSignature {
     zip.write(exportBin);
     zip.closeEntry();
 
-    var signatureList = getSignatureObject(exportBin);
+    var signatureList = isV2 ? getSignatureObjectV2(exportBin) : getSignatureObjectV1(exportBin);
     digest.update(exportBin);
     digest.update(keyPair.getPublic().getEncoded());
     hashOut.write(digest.digest());
@@ -122,6 +109,35 @@ public class ProtoSignature {
 
     return new ProtoSignatureWrapper(hashOut.toByteArray(), byteOut.toByteArray());
   }
+  /**
+   * Creates a ZIP file containing the given keys and the corresponding signature.
+   *
+   * @param keys
+   * @return
+   * @throws IOException
+   * @throws InvalidKeyException
+   * @throws SignatureException
+   * @throws NoSuchAlgorithmException
+   */
+  public ProtoSignatureWrapper getPayloadV2(List<GaenKey> keys)
+      throws InvalidKeyException, SignatureException, NoSuchAlgorithmException, IOException {
+    return getPayload(keys, true);
+  }
+
+  /**
+   * Creates a ZIP file containing the given keys and the corresponding signature.
+   *
+   * @param keys
+   * @return
+   * @throws IOException
+   * @throws InvalidKeyException
+   * @throws SignatureException
+   * @throws NoSuchAlgorithmException
+   */
+  public ProtoSignatureWrapper getPayloadV1(List<GaenKey> keys)
+      throws IOException, InvalidKeyException, SignatureException, NoSuchAlgorithmException {
+    return getPayload(keys, false);
+  }
 
   private byte[] sign(byte[] data)
       throws SignatureException, InvalidKeyException, NoSuchAlgorithmException {
@@ -131,13 +147,18 @@ public class ProtoSignature {
     return signature.sign();
   }
 
-  private TemporaryExposureKeyFormat.TEKSignatureList getSignatureObject(byte[] keyExport)
-      throws InvalidKeyException, SignatureException, NoSuchAlgorithmException {
+  private org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat.TEKSignatureList
+      getSignatureObjectV1(byte[] keyExport)
+          throws InvalidKeyException, SignatureException, NoSuchAlgorithmException {
     byte[] exportSignature = sign(keyExport);
-    var signatureList = TemporaryExposureKeyFormat.TEKSignatureList.newBuilder();
-    var theSignature = TemporaryExposureKeyFormat.TEKSignature.newBuilder();
+    var signatureList =
+        org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat.TEKSignatureList
+            .newBuilder();
+    var theSignature =
+        org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat.TEKSignature
+            .newBuilder();
     theSignature
-        .setSignatureInfo(tekSignature())
+        .setSignatureInfo(tekSignatureV1())
         .setSignature(ByteString.copyFrom(exportSignature))
         .setBatchNum(1)
         .setBatchSize(1);
@@ -145,8 +166,43 @@ public class ProtoSignature {
     return signatureList.build();
   }
 
-  private SignatureInfo tekSignature() {
-    var tekSignature = TemporaryExposureKeyFormat.SignatureInfo.newBuilder();
+  private org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat.SignatureInfo
+      tekSignatureV1() {
+    var tekSignature =
+        org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat.SignatureInfo
+            .newBuilder();
+    tekSignature
+        .setAppBundleId(appBundleId)
+        .setVerificationKeyVersion(keyVersion)
+        .setVerificationKeyId(keyVerificationId)
+        .setSignatureAlgorithm(algorithm);
+    return tekSignature.build();
+  }
+
+  private org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.TEKSignatureList
+      getSignatureObjectV2(byte[] keyExport)
+          throws InvalidKeyException, SignatureException, NoSuchAlgorithmException {
+    byte[] exportSignature = sign(keyExport);
+    var signatureList =
+        org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.TEKSignatureList
+            .newBuilder();
+    var theSignature =
+        org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.TEKSignature
+            .newBuilder();
+    theSignature
+        .setSignatureInfo(tekSignatureV2())
+        .setSignature(ByteString.copyFrom(exportSignature))
+        .setBatchNum(1)
+        .setBatchSize(1);
+    signatureList.addSignatures(theSignature);
+    return signatureList.build();
+  }
+
+  private org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.SignatureInfo
+      tekSignatureV2() {
+    var tekSignature =
+        org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.SignatureInfo
+            .newBuilder();
     tekSignature
         .setAppBundleId(appBundleId)
         .setVerificationKeyVersion(keyVersion)
@@ -159,7 +215,7 @@ public class ProtoSignature {
     return keyPair.getPublic();
   }
 
-  public byte[] getPayload(Map<String, List<GaenKey>> groupedBuckets)
+  public byte[] getPayload(Map<String, List<GaenKey>> groupedBuckets, boolean isV2)
       throws IOException, InvalidKeyException, SignatureException, NoSuchAlgorithmException {
     ByteArrayOutputStream byteOutCollection = new ByteArrayOutputStream();
     ZipOutputStream zipCollection = new ZipOutputStream(byteOutCollection);
@@ -172,7 +228,8 @@ public class ProtoSignature {
       }
 
       var keyDate = Duration.of(keys.get(0).getRollingStartNumber(), GaenUnit.TenMinutes);
-      var protoFile = getProtoKey(keys, keyDate, true);
+      var protoFile =
+          isV2 ? getProtoKeyV2(keys, keyDate, true) : getProtoKeyV1(keys, keyDate, true);
       var zipFileName = new StringBuilder();
 
       zipFileName.append("key_export_").append(group);
@@ -189,7 +246,7 @@ public class ProtoSignature {
       zip.write(exportBin);
       zip.closeEntry();
 
-      var signatureList = getSignatureObject(exportBin);
+      var signatureList = isV2 ? getSignatureObjectV2(exportBin) : getSignatureObjectV1(exportBin);
 
       byte[] exportSig = signatureList.toByteArray();
       zip.putNextEntry(new ZipEntry("export.sig"));
@@ -209,7 +266,7 @@ public class ProtoSignature {
     return byteOutCollection.toByteArray();
   }
 
-  public byte[] getPayload(Collection<List<GaenKey>> buckets)
+  public byte[] getPayloadV1(Collection<List<GaenKey>> buckets)
       throws IOException, InvalidKeyException, SignatureException, NoSuchAlgorithmException {
     Map<String, List<GaenKey>> grouped = new HashMap<String, List<GaenKey>>();
     for (var keys : buckets) {
@@ -220,23 +277,42 @@ public class ProtoSignature {
               .toString();
       grouped.put(keyLocalDate, keys);
     }
-    return getPayload(grouped);
+    return getPayload(grouped, false);
   }
 
-  private TemporaryExposureKeyFormat.TemporaryExposureKeyExport getProtoKey(
-      List<GaenKey> exposedKeys, Duration batchReleaseTimeDuration, boolean debug) {
-    var file = TemporaryExposureKeyFormat.TemporaryExposureKeyExport.newBuilder();
+  public byte[] getPayloadV2(Collection<List<GaenKey>> buckets)
+      throws IOException, InvalidKeyException, SignatureException, NoSuchAlgorithmException {
+    Map<String, List<GaenKey>> grouped = new HashMap<String, List<GaenKey>>();
+    for (var keys : buckets) {
+      if (keys.isEmpty()) continue;
+      var keyLocalDate =
+          UTCInstant.of(keys.get(0).getRollingStartNumber(), GaenUnit.TenMinutes)
+              .getLocalDate()
+              .toString();
+      grouped.put(keyLocalDate, keys);
+    }
+    return getPayload(grouped, true);
+  }
 
-    var tekList = new ArrayList<TemporaryExposureKeyFormat.TemporaryExposureKey>();
+  private org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat
+          .TemporaryExposureKeyExport
+      getProtoKeyV1(List<GaenKey> exposedKeys, Duration batchReleaseTimeDuration, boolean debug) {
+    var file =
+        org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat
+            .TemporaryExposureKeyExport.newBuilder();
+
+    var tekList =
+        new ArrayList<
+            org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat
+                .TemporaryExposureKey>();
     for (var key : exposedKeys) {
-      Builder builder =
-          TemporaryExposureKey.newBuilder()
+      var protoKey =
+          org.dpppt.backend.sdk.model.gaen.proto.v1.TemporaryExposureKeyFormat.TemporaryExposureKey
+              .newBuilder()
               .setKeyData(ByteString.copyFrom(Base64.getDecoder().decode(key.getKeyData())))
               .setRollingPeriod(key.getRollingPeriod())
               .setRollingStartIntervalNumber(key.getRollingStartNumber())
-              .setDaysSinceOnsetOfSymptoms(key.getDaysSinceOnsetOfSymptoms())
-              .setReportType(ReportType.valueOf(key.getReportType()));
-      var protoKey = builder.build();
+              .build();
       tekList.add(protoKey);
     }
 
@@ -248,7 +324,45 @@ public class ProtoSignature {
         .setStartTimestamp(batchReleaseTimeDuration.toSeconds())
         .setEndTimestamp(batchReleaseTimeDuration.toSeconds() + releaseBucketDuration.toSeconds());
 
-    file.addSignatureInfos(tekSignature());
+    file.addSignatureInfos(tekSignatureV1());
+
+    return file.build();
+  }
+
+  private org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat
+          .TemporaryExposureKeyExport
+      getProtoKeyV2(List<GaenKey> exposedKeys, Duration batchReleaseTimeDuration, boolean debug) {
+    var file =
+        org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat
+            .TemporaryExposureKeyExport.newBuilder();
+
+    var tekList =
+        new ArrayList<
+            org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat
+                .TemporaryExposureKey>();
+    for (var key : exposedKeys) {
+      var protoKey =
+          org.dpppt.backend.sdk.model.gaen.proto.v2.TemporaryExposureKeyFormat.TemporaryExposureKey
+              .newBuilder()
+              .setKeyData(ByteString.copyFrom(Base64.getDecoder().decode(key.getKeyData())))
+              .setRollingPeriod(key.getRollingPeriod())
+              .setRollingStartIntervalNumber(key.getRollingStartNumber())
+              .setReportType(ReportType.CONFIRMED_TEST)
+              // TODO: placeholder for know
+              .setDaysSinceOnsetOfSymptoms(key.getDaysSinceOnsetOfSymptoms())
+              .build();
+      tekList.add(protoKey);
+    }
+
+    file.addAllKeys(tekList);
+
+    file.setRegion(gaenRegion)
+        .setBatchNum(1)
+        .setBatchSize(1)
+        .setStartTimestamp(batchReleaseTimeDuration.toSeconds())
+        .setEndTimestamp(batchReleaseTimeDuration.toSeconds() + releaseBucketDuration.toSeconds());
+
+    file.addSignatureInfos(tekSignatureV2());
 
     return file.build();
   }
