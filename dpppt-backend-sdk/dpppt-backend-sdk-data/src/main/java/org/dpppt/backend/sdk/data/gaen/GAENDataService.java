@@ -71,10 +71,8 @@ public interface GAENDataService {
    * which day was the key used) publishedAfter/publishedUntil (when was the key published) and now
    * (has the key expired or not, based on rollingStartNumber and rollingPeriod).
    *
-   * @param keyDate must be midnight UTC
+   * @param since return keys published after this instant
    * @param forCountries return keys for the specified countries
-   * @param publishedAfter when publication should start
-   * @param publishedUntil last publication
    * @param now the start of the query
    * @return all exposeed keys for the given batch
    */

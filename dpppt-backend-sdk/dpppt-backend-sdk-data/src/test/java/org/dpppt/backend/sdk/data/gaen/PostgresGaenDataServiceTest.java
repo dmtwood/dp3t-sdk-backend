@@ -180,7 +180,7 @@ public class PostgresGaenDataServiceTest {
     var now = UTCInstant.now();
     // calculate exposed until bucket, but get bucket in the future, as keys have
     // been inserted with timestamp now.
-    UTCInstant publishedUntil = now.roundToNextBucket(BATCH_LENGTH);
+    UTCInstant publishedUntil = now.roundToNextBucketStart(BATCH_LENGTH);
 
     var returnedKeys =
         gaenDataService.getSortedExposedForKeyDate(

@@ -60,7 +60,7 @@ public class GaenDataServiceTest {
 
     // calculate exposed until bucket, but get bucket in the future, as keys have
     // been inserted with timestamp now.
-    UTCInstant publishedUntil = now.roundToNextBucket(BUCKET_LENGTH);
+    UTCInstant publishedUntil = now.roundToNextBucketStart(BUCKET_LENGTH);
 
     var returnedKeys =
         gaenDataService.getSortedExposedForKeyDate(
@@ -97,7 +97,7 @@ public class GaenDataServiceTest {
 
     // eleven O'clock no key
     try (var now = UTCInstant.setClock(elevenOClock)) {
-      UTCInstant publishedUntil = now.roundToNextBucket(BUCKET_LENGTH).plusMinutes(1);
+      UTCInstant publishedUntil = now.roundToNextBucketStart(BUCKET_LENGTH).plusMinutes(1);
       var returnedKeys =
           gaenDataService.getSortedExposedForKeyDate(now.atStartOfDay(), null, publishedUntil, now);
       assertEquals(0, returnedKeys.size());
@@ -105,7 +105,7 @@ public class GaenDataServiceTest {
 
     // twelve O'clock release the key
     try (var now = UTCInstant.setClock(fourteenOClock)) {
-      UTCInstant publishedUntil = now.roundToNextBucket(BUCKET_LENGTH);
+      UTCInstant publishedUntil = now.roundToNextBucketStart(BUCKET_LENGTH);
       var returnedKeys =
           gaenDataService.getSortedExposedForKeyDate(now.atStartOfDay(), null, publishedUntil, now);
       assertEquals(1, returnedKeys.size());

@@ -198,7 +198,7 @@ public class GaenControllerTest extends BaseControllerTest {
         gaenDataService.getSortedExposedForKeyDate(
             now.atStartOfDay().minusDays(1),
             null,
-            now.roundToNextBucket(releaseBucketDuration),
+            now.roundToNextBucketStart(releaseBucketDuration),
             now);
     assertEquals(2, result.size());
     for (var key : result) {
@@ -219,13 +219,13 @@ public class GaenControllerTest extends BaseControllerTest {
         gaenDataService.getSortedExposedForKeyDate(
             now.atStartOfDay(),
             null,
-            tomorrow2AM.roundToNextBucket(releaseBucketDuration),
+            tomorrow2AM.roundToNextBucketStart(releaseBucketDuration),
             tomorrow2AM);
     assertEquals(1, result.size());
 
     result =
         gaenDataService.getSortedExposedForKeyDate(
-            now.atStartOfDay(), null, now.roundToNextBucket(releaseBucketDuration), now);
+            now.atStartOfDay(), null, now.roundToNextBucketStart(releaseBucketDuration), now);
     assertEquals(0, result.size());
 
     result =
@@ -296,7 +296,7 @@ public class GaenControllerTest extends BaseControllerTest {
 
     var result =
         gaenDataService.getSortedExposedForKeyDate(
-            midnight.minusDays(1), null, now.roundToNextBucket(releaseBucketDuration), now);
+            midnight.minusDays(1), null, now.roundToNextBucketStart(releaseBucketDuration), now);
     // all keys are invalid
     assertEquals(0, result.size());
   }
@@ -403,12 +403,12 @@ public class GaenControllerTest extends BaseControllerTest {
 
     var result =
         gaenDataService.getSortedExposedForKeyDate(
-            midnight.minusDays(1), null, now.roundToNextBucket(releaseBucketDuration), now);
+            midnight.minusDays(1), null, now.roundToNextBucketStart(releaseBucketDuration), now);
     // all keys are invalid
     assertEquals(0, result.size());
     result =
         gaenDataService.getSortedExposedForKeyDate(
-            midnight, null, now.roundToNextBucket(releaseBucketDuration), now);
+            midnight, null, now.roundToNextBucketStart(releaseBucketDuration), now);
     // all keys are invalid
     assertEquals(0, result.size());
   }
@@ -770,7 +770,7 @@ public class GaenControllerTest extends BaseControllerTest {
             .andReturn();
     var result =
         gaenDataService.getSortedExposedForKeyDate(
-            midnight.minusDays(2), null, now.roundToNextBucket(releaseBucketDuration), now);
+            midnight.minusDays(2), null, now.roundToNextBucketStart(releaseBucketDuration), now);
 
     assertEquals(0, result.size());
   }
@@ -861,7 +861,7 @@ public class GaenControllerTest extends BaseControllerTest {
             .andReturn();
     var result =
         gaenDataService.getSortedExposedForKeyDate(
-            midnight.plusDays(2), null, now.roundToNextBucket(releaseBucketDuration), now);
+            midnight.plusDays(2), null, now.roundToNextBucketStart(releaseBucketDuration), now);
 
     assertEquals(0, result.size());
   }
@@ -909,7 +909,7 @@ public class GaenControllerTest extends BaseControllerTest {
             .andReturn();
     var result =
         gaenDataService.getSortedExposedForKeyDate(
-            midnight.minusDays(22), null, now.roundToNextBucket(releaseBucketDuration), now);
+            midnight.minusDays(22), null, now.roundToNextBucketStart(releaseBucketDuration), now);
     assertEquals(0, result.size());
   }
 

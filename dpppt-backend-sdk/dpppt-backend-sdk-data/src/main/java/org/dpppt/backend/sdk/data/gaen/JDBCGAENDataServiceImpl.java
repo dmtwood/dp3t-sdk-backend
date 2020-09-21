@@ -79,7 +79,7 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
   public void insertExposees(
       List<GaenKey> keys, List<CountryShareConfiguration> visitedCountries, UTCInstant now) {
     // Calculate the `receivedAt` just at the end of the current releaseBucket.
-    var receivedAt = now.roundToNextBucket(releaseBucketDuration).minus(Duration.ofMillis(1));
+    var receivedAt = now.roundToBucketEnd(releaseBucketDuration);
     List<MapSqlParameterSource> visitedBatchInsert = new ArrayList<>();
     for (GaenKey k : keys) {
       MapSqlParameterSource keyParams = createInsertParamsForKey(k, receivedAt);
@@ -104,7 +104,7 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
     params.addValue("rollingPeriodStartNumberStart", keyDate.get10MinutesSince1970());
     params.addValue("rollingPeriodStartNumberEnd", keyDate.plusDays(1).get10MinutesSince1970());
     params.addValue("publishedUntil", publishedUntil.getDate());
-    // for v1 we don't have different countries, so we only want keys which were used n
+    // for v1 we don't have different countries, so we only want keys which were used in
     // origin_country
     params.addValue("origin_country", originCountry);
 
@@ -174,7 +174,7 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
             + " key.received_at < :maxBucket AND key.expiry <= key.received_at) OR (key.expiry"
             + " >= :since AND key.expiry < :maxBucket AND key.expiry > key.received_at))";
 
-    sql += " order key.by pk_exposed_id desc";
+    sql += " order by key.pk_exposed_id desc";
 
     return jt.query(sql, params, new GaenKeyRowMapper());
   }

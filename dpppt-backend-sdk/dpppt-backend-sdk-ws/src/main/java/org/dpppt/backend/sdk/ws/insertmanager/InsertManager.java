@@ -58,7 +58,7 @@ public class InsertManager {
   public void insertIntoDatabase(
       List<GaenKey> keys, String header, Object principal, UTCInstant now) throws InsertException {
     insertIntoDatabase(
-        keys, List.of(CountryShareConfiguration.ORIGIN_COUNRY), header, principal, now);
+        keys, List.of(CountryShareConfiguration.ORIGIN_COUNTRY), header, principal, now);
   }
 
   /**

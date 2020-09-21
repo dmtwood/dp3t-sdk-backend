@@ -161,10 +161,19 @@ public class UTCInstant implements Closeable {
 
   /**
    * @param releaseBucketDuration
+   * @return the end of the bucket this UTCInstant is in. If the UTCInstant is already at the
+   *     end of a bucket, it will be returned as-is.
+   */
+  public UTCInstant roundToBucketEnd(Duration releaseBucketDuration) {
+    return roundToNextBucketStart(releaseBucketDuration).minus(Duration.ofMillis(1));
+  }
+
+  /**
+   * @param releaseBucketDuration
    * @return the start of the next bucket of this UTCInstant. If the UTCInstant is at the beginning
    *     of a bucket, the next bucket will be returned.
    */
-  public UTCInstant roundToNextBucket(Duration releaseBucketDuration) {
+  public UTCInstant roundToNextBucketStart(Duration releaseBucketDuration) {
     long rounding = releaseBucketDuration.toMillis();
     return new UTCInstant(((this.timestamp / rounding) + 1) * rounding);
   }
