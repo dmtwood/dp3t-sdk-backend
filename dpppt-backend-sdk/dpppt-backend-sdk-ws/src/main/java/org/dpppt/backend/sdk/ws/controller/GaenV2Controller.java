@@ -13,6 +13,8 @@ import java.util.concurrent.Callable;
 import javax.validation.Valid;
 import org.dpppt.backend.sdk.data.gaen.FakeKeyService;
 import org.dpppt.backend.sdk.data.gaen.GAENDataService;
+import org.dpppt.backend.sdk.model.gaen.CountryShareConfiguration;
+import org.dpppt.backend.sdk.model.gaen.GaenV2UploadKeysInternationalRequest;
 import org.dpppt.backend.sdk.model.gaen.GaenV2UploadKeysRequest;
 import org.dpppt.backend.sdk.utils.DurationExpiredException;
 import org.dpppt.backend.sdk.utils.UTCInstant;
@@ -75,6 +77,7 @@ public class GaenV2Controller {
   private final Duration releaseBucketDuration;
   private final Duration requestTime;
   private final Duration exposedListCacheControl;
+  private final String originCountry;
 
   public GaenV2Controller(
       InsertManager insertManager,
@@ -85,7 +88,8 @@ public class GaenV2Controller {
       GAENDataService dataService,
       Duration releaseBucketDuration,
       Duration requestTime,
-      Duration exposedListCacheControl) {
+      Duration exposedListCacheControl,
+      String originCountry) {
     this.insertManager = insertManager;
     this.validateRequest = validateRequest;
     this.validationUtils = validationUtils;
@@ -95,9 +99,111 @@ public class GaenV2Controller {
     this.releaseBucketDuration = releaseBucketDuration;
     this.requestTime = requestTime;
     this.exposedListCacheControl = exposedListCacheControl;
+    this.originCountry = originCountry;
   }
 
   @PostMapping(value = "/exposed")
+  @Documentation(
+      description =
+          "Endpoint used to upload exposure keys to the backend specifying for which countries the"
+              + " keys are valid.",
+      responses = {
+          "200=>The exposed keys have been stored in the database",
+          "400=> "
+              + "- Invalid base64 encoding in GaenRequest"
+              + "- negative rolling period"
+              + "- fake claim with non-fake keys",
+          "403=>Authentication failed"
+      })
+  public @ResponseBody Callable<ResponseEntity<String>> addExposed(
+      @Documentation(
+          description =
+              "JSON Object containing all keys. Visited countries are not specified for this"
+                  + " request, instead the origin_country specified in the backend is used.")
+      @Valid
+      @RequestBody
+          GaenV2UploadKeysRequest gaenV2Request,
+      @RequestHeader(value = "User-Agent")
+      @Documentation(
+          description =
+              "App Identifier (PackageName/BundleIdentifier) + App-Version + OS (Android/iOS)"
+                  + " + OS-Version",
+          example = "ch.ubique.android.starsdk;1.0;iOS;13.3")
+          String userAgent,
+      @AuthenticationPrincipal
+      @Documentation(description = "JWT token that can be verified by the backend server")
+          Object principal)
+      throws WrongScopeException, InsertException {
+    var now = UTCInstant.now();
+
+    this.validateRequest.isValid(principal);
+
+    // Filter out non valid keys and insert them into the database (c.f.
+    // InsertManager and
+    // configured Filters in the WSBaseConfig)
+    insertManager.insertIntoDatabase(
+        gaenV2Request.getGaenKeys(),
+        List.of(new CountryShareConfiguration(originCountry, 1)),
+        userAgent,
+        principal,
+        now);
+    var responseBuilder = ResponseEntity.ok();
+    Callable<ResponseEntity<String>> cb =
+        () -> {
+          try {
+            now.normalizeDuration(requestTime);
+          } catch (DurationExpiredException e) {
+            logger.error("Total time spent in endpoint is longer than requestTime");
+          }
+          return responseBuilder.body("OK");
+        };
+    return cb;
+  }
+
+  // GET for Key Download
+  @GetMapping(value = "/exposed")
+  @Documentation(
+      description =
+          "Requests the exposed keys published _since_ originating from list of _country_",
+      responses = {
+          "200 => zipped export.bin and export.sig of all keys in that interval",
+          "404 => Invalid _country_ or invalid _since_ (too far in the past/future, not at bucket"
+              + " boundaries)"
+      })
+  public @ResponseBody ResponseEntity<byte[]> getExposedKeys(
+      @Documentation(
+          description =
+              "Timestamp to retrieve exposed keys since, in milliseconds since Unix epoch"
+                  + " (1970-01-01). It must indicate the beginning of a bucket.",
+          example = "1593043200000")
+      @RequestParam
+          long since)
+      throws BadBatchReleaseTimeException, InvalidKeyException, SignatureException,
+      NoSuchAlgorithmException, IOException {
+    var now = UTCInstant.now();
+    var keysSince = UTCInstant.ofEpochMillis(since);
+    if (!validationUtils.isValidBatchReleaseTime(keysSince, now)) {
+      return ResponseEntity.notFound().build();
+    }
+    UTCInstant publishedUntil = now.roundToBucketStart(releaseBucketDuration);
+
+    var exposedKeys = dataService.getSortedExposedSince(keysSince, List.of(originCountry), now);
+
+    if (exposedKeys.isEmpty()) {
+      return ResponseEntity.noContent()
+          .cacheControl(CacheControl.maxAge(exposedListCacheControl))
+          .header("X-PUBLISHED-UNTIL", Long.toString(publishedUntil.getTimestamp()))
+          .build();
+    }
+    ProtoSignatureWrapper payload = gaenSigner.getPayloadV1(exposedKeys);
+
+    return ResponseEntity.ok()
+        .cacheControl(CacheControl.maxAge(exposedListCacheControl))
+        .header("X-PUBLISHED-UNTIL", Long.toString(publishedUntil.getTimestamp()))
+        .body(payload.getZip());
+  }
+
+  @PostMapping(value = "/international/exposed")
   @Documentation(
       description =
           "Endpoint used to upload exposure keys to the backend specifying for which countries the"
@@ -110,7 +216,7 @@ public class GaenV2Controller {
             + "- fake claim with non-fake keys",
         "403=>Authentication failed"
       })
-  public @ResponseBody Callable<ResponseEntity<String>> addExposed(
+  public @ResponseBody Callable<ResponseEntity<String>> addInternationalExposed(
       @Documentation(
               description =
                   "JSON Object containing all keys and a list of countries specifying for which"
@@ -118,7 +224,7 @@ public class GaenV2Controller {
                       + " visited")
           @Valid
           @RequestBody
-          GaenV2UploadKeysRequest gaenV2Request,
+          GaenV2UploadKeysInternationalRequest gaenV2Request,
       @RequestHeader(value = "User-Agent")
           @Documentation(
               description =
@@ -157,7 +263,7 @@ public class GaenV2Controller {
   }
 
   // GET for Key Download
-  @GetMapping(value = "/exposed")
+  @GetMapping(value = "/international/exposed")
   @Documentation(
       description =
           "Requests the exposed keys published _since_ originating from list of _country_",
@@ -166,7 +272,7 @@ public class GaenV2Controller {
         "404 => Invalid _country_ or invalid _since_ (too far in the past/future, not at bucket"
             + " boundaries)"
       })
-  public @ResponseBody ResponseEntity<byte[]> getExposedKeys(
+  public @ResponseBody ResponseEntity<byte[]> getInternationalExposedKeys(
       @Documentation(
               description =
                   "List of origin countries of requested keys. (iso-3166-1 alpha-2). Must be"

@@ -7,7 +7,16 @@ import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Size;
 
-public class GaenV2UploadKeysRequest {
+public class GaenV2UploadKeysInternationalRequest {
+
+  @NotNull
+  @NotEmpty
+  @Valid
+  @Documentation(
+      description =
+          "List of all countries configured. For each country in the list, sharing must be"
+              + " explicitly set")
+  List<CountryShareConfiguration> countriesForSharingKeys;
 
   @NotNull
   @NotEmpty
@@ -23,5 +32,13 @@ public class GaenV2UploadKeysRequest {
 
   public void setGaenKeys(List<GaenKey> gaenKeys) {
     this.gaenKeys = gaenKeys;
+  }
+
+  public List<CountryShareConfiguration> getCountriesForSharingKeys() {
+    return countriesForSharingKeys;
+  }
+
+  public void setCountriesForSharingKeys(List<CountryShareConfiguration> countriesForSharingKeys) {
+    this.countriesForSharingKeys = countriesForSharingKeys;
   }
 }
