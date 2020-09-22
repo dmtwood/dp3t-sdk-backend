@@ -60,7 +60,7 @@ public class GaenKey {
               + " there are no different possibilities, this can omitted and will be set when"
               + " downloading the keys. C.f. ReportType.java",
       example = "")
-  private String reportType = ReportType.CONFIRMED_TEST.name();
+  private ReportType reportType;
 
   @Documentation(
       description =
@@ -68,7 +68,7 @@ public class GaenKey {
               + " which are subtracted, this can be omitted",
       example = "1")
   // TODO: what is the correct value
-  private Integer daysSinceOnsetOfSymptoms = 5;
+  private Integer daysSinceOnsetOfSymptoms;
 
   public GaenKey() {}
 
@@ -133,11 +133,11 @@ public class GaenKey {
     this.origin = origin;
   }
 
-  public String getReportType() {
+  public ReportType getReportType() {
     return this.reportType;
   }
 
-  public void setReportType(String reportType) {
+  public void setReportType(ReportType reportType) {
     this.reportType = reportType;
   }
 

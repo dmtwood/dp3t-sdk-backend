@@ -203,8 +203,8 @@ public class JDBCGAENDataServiceImpl implements GAENDataService {
     params.addValue("rolling_start_number", k.getRollingStartNumber());
     params.addValue("rolling_period", k.getRollingPeriod());
     params.addValue("origin", this.originCountry);
-    params.addValue("report_type", null);
-    params.addValue("days_since_onset_of_symptoms", null);
+    params.addValue("report_type", k.getReportType());
+    params.addValue("days_since_onset_of_symptoms", k.getDaysSinceOnsetOfSymptoms());
     params.addValue("received_at", receivedAt.getDate());
     return params;
   }

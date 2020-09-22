@@ -1,6 +1,6 @@
 package org.dpppt.backend.sdk.model.gaen;
 
-enum ReportType {
+public enum ReportType {
   UNKNOWN, // Never returned by the client API.
   CONFIRMED_TEST,
   CONFIRMED_CLINICAL_DIAGNOSIS,
