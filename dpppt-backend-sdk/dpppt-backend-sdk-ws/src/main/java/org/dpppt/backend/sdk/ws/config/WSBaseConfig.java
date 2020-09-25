@@ -30,6 +30,7 @@ import org.dpppt.backend.sdk.data.gaen.FakeKeyService;
 import org.dpppt.backend.sdk.data.gaen.GAENDataService;
 import org.dpppt.backend.sdk.data.gaen.JDBCGAENDataServiceImpl;
 import org.dpppt.backend.sdk.ws.controller.GaenController;
+import org.dpppt.backend.sdk.ws.controller.GaenV2Controller;
 import org.dpppt.backend.sdk.ws.filter.ResponseWrapperFilter;
 import org.dpppt.backend.sdk.ws.insertmanager.InsertManager;
 import org.dpppt.backend.sdk.ws.insertmanager.insertionfilters.AssertKeyFormat;
@@ -293,6 +294,24 @@ public abstract class WSBaseConfig implements SchedulingConfigurer, WebMvcConfig
         Duration.ofMillis(requestTime),
         Duration.ofMillis(exposedListCacheControl),
         keyVault.get("nextDayJWT").getPrivate());
+  }
+
+  @Bean
+  public GaenV2Controller gaenV2Controller() {
+    ValidateRequest theValidator = gaenRequestValidator;
+    if (theValidator == null) {
+      theValidator = backupValidator();
+    }
+    return new GaenV2Controller(
+        insertManagerExposed(),
+        theValidator,
+        gaenValidationUtils(),
+        fakeKeyService(),
+        gaenSigner(),
+        gaenDataService(),
+        Duration.ofMillis(releaseBucketDuration),
+        Duration.ofMillis(requestTime),
+        Duration.ofMillis(exposedListCacheControl));
   }
 
   @Bean
